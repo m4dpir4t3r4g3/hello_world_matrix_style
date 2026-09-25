@@ -2,6 +2,8 @@
 
 A Matrix-inspired "Hello, World" that greets you every time you log in to i3.
 
+![matrix-hello demo](docs/demo.gif)
+
 ```
   Wake up, Neo...
   The Matrix has you...
@@ -19,7 +21,8 @@ It needs only `python3`, which Xubuntu ships with, and runs in the curses termin
 ## Install (Xubuntu + i3)
 
 ```bash
-git clone <this repo> && cd hello_world_matrix_style
+git clone https://github.com/m4dpir4t3r4g3/hello_world_matrix_style.git
+cd hello_world_matrix_style
 ./install.sh
 matrix-hello-launch --force      # try it right now
 ```
@@ -72,3 +75,7 @@ You can also add script flags after the launcher path.
 
 If the katakana shows up as boxes, install a font that has it
 (`sudo apt install fonts-noto-cjk`) or use `--ascii`.
+
+## License
+
+[MIT](LICENSE)
