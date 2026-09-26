@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
-# Opens matrix_hello.py in a fullscreen terminal. Meant to run from i3's
-# `exec` (or XDG autostart) once the desktop is up.
+# Opens matrix_hello.py in a fullscreen terminal. Meant to run from your
+# desktop's autostart (or i3/sway/Hyprland `exec`) once you're logged in.
 #
 #   matrix-hello-launch            run once per login (later calls are no-ops)
 #   matrix-hello-launch --force    run regardless; extra args go to the script
 #
 # Env: MATRIX_HELLO_DELAY    seconds to wait for the desktop (default 2)
-#      MATRIX_HELLO_TERMINAL force a terminal (xfce4-terminal, alacritty, ...)
+#      MATRIX_HELLO_TERMINAL force a terminal (konsole, alacritty, ...)
 #      MATRIX_HELLO_NAME     who to wake up (default Neo)
 set -u
 
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-SCRIPT="$DIR/matrix_hello.py"
-TITLE="matrix-hello"
+. "$DIR/term.sh"
 
-# One run per login: i3 and the XFCE session may both autostart us, and
+# One run per login: several autostart mechanisms may fire, and
 # $XDG_RUNTIME_DIR is wiped on logout/reboot, so the lock resets itself.
 if [[ "${1:-}" == "--force" ]]; then
     shift
@@ -24,39 +23,5 @@ fi
 
 sleep "${MATRIX_HELLO_DELAY:-2}"
 
-CMD=(python3 "$SCRIPT" "$@")
-
-term="${MATRIX_HELLO_TERMINAL:-}"
-if [[ -z "$term" ]]; then
-    for t in xfce4-terminal alacritty kitty gnome-terminal xterm i3-sensible-terminal x-terminal-emulator; do
-        if command -v "$t" >/dev/null 2>&1; then term="$t"; break; fi
-    done
-fi
-
-case "$term" in
-    xfce4-terminal)
-        xfce4-terminal --disable-server --fullscreen --hide-menubar --hide-toolbar \
-            --title="$TITLE" -x "${CMD[@]}" & ;;
-    alacritty)
-        alacritty --title "$TITLE" -o window.startup_mode=Fullscreen -e "${CMD[@]}" & ;;
-    kitty)
-        kitty --title "$TITLE" --start-as=fullscreen "${CMD[@]}" & ;;
-    gnome-terminal)
-        gnome-terminal --full-screen --title="$TITLE" -- "${CMD[@]}" & ;;
-    xterm)
-        xterm -fullscreen -bg black -fa Monospace -fs 13 -T "$TITLE" -e "${CMD[@]}" & ;;
-    "")
-        echo "matrix-hello: no terminal emulator found" >&2; exit 1 ;;
-    *)
-        "$term" -e "${CMD[@]}" & ;;
-esac
-
-# Belt and braces: ask i3 to fullscreen the window in case the terminal's own
-# fullscreen flag was ignored. The script sets its window title on startup.
-if command -v i3-msg >/dev/null 2>&1; then
-    for _ in 1 2 3 4 5; do
-        sleep 0.4
-        i3-msg -q "[title=\"^$TITLE\$\"] fullscreen enable" >/dev/null 2>&1 && break
-    done
-fi
+matrix_open_terminal 1 matrix-hello python3 "$DIR/matrix_hello.py" "$@" || exit 1
 wait

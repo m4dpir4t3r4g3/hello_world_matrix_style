@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Opens a Matrix-themed terminal: a burst of digital rain, then a bash shell
+# in green on black.
+#
+#   matrix-terminal          open a new Matrix terminal window
+#   matrix-terminal --here   turn the current terminal into one
+set -u
+
+DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+SHELL_CMD=(bash --rcfile "$DIR/matrix.bashrc" -i)
+
+if [[ "${1:-}" == "--here" ]]; then
+    exec "${SHELL_CMD[@]}"
+fi
+
+. "$DIR/term.sh"
+matrix_open_terminal 0 Matrix "${SHELL_CMD[@]}"
