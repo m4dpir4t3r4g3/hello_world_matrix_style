@@ -9,19 +9,25 @@ matrix-hello: a Matrix-inspired "Hello, World".
 
 ...then digital rain, then HELLO, WORLD decoded out of the code.
 
-Only uses the Python standard library (curses). Keys:
+Uses only the Python standard library (curses) on Linux and macOS. On
+Windows, curses comes from the `windows-curses` package. Keys:
     any key   skip to the next scene (exits on the final scene)
     q / Esc   quit immediately
 """
 
 import argparse
-import curses
 import locale
 import math
 import os
 import random
 import sys
 import time
+
+try:
+    import curses
+except ImportError:
+    sys.exit("matrix-hello needs the curses module.\n"
+             "On Windows, install it with:  py -m pip install windows-curses")
 
 TITLE = "matrix-hello"
 
@@ -111,6 +117,8 @@ class Screen:
 
     def poll(self):
         ch = self.s.getch()
+        if ch == curses.KEY_RESIZE and os.name == "nt":
+            curses.resize_term(0, 0)  # PDCurses only picks up the new size when asked
         if ch in (-1, curses.KEY_RESIZE):
             return
         if ch in (ord("q"), ord("Q"), 27):
@@ -373,6 +381,12 @@ def finale(sc, rain, message, name, timeout):
 def run(stdscr, args):
     sc = Screen(stdscr, args)
     try:
+        if args.splash:
+            try:
+                rain_phase(sc, Rain(sc), args.splash)
+            except Skip:
+                pass
+            return
         if not args.no_intro:
             try:
                 intro(sc, args.name)
@@ -402,20 +416,28 @@ def main():
                    help="auto-exit this many seconds after the message appears; 0 waits forever")
     p.add_argument("--fps", type=int, default=24, help="frames per second (default: 24)")
     p.add_argument("--no-intro", action="store_true", help="skip the 'Wake up, Neo' intro")
+    p.add_argument("--splash", type=float, metavar="SECONDS",
+                   help="only show the rain for SECONDS, then exit (used by matrix-terminal)")
     p.add_argument("--ascii", action="store_true",
                    help="ASCII glyphs only, for fonts without katakana")
     args = p.parse_args()
     args.fps = max(5, min(args.fps, 60))
 
     locale.setlocale(locale.LC_ALL, "")
-    if not args.ascii and "UTF-8" not in (locale.getpreferredencoding(False) or "").upper():
-        args.ascii = True
     os.environ.setdefault("ESCDELAY", "25")
 
-    # Set the window title so i3 can find (and fullscreen) the window.
-    if sys.stdout.isatty():
-        sys.stdout.write(f"\033]0;{TITLE}\007")
-        sys.stdout.flush()
+    # Set the window title so window managers (i3, sway) can find the window.
+    if os.name == "nt":
+        # windows-curses draws Unicode through the console API whatever the
+        # code page is, so there's no need to fall back to ASCII here.
+        import ctypes
+        ctypes.windll.kernel32.SetConsoleTitleW(TITLE)
+    else:
+        if not args.ascii and "UTF-8" not in (locale.getpreferredencoding(False) or "").upper():
+            args.ascii = True
+        if sys.stdout.isatty():
+            sys.stdout.write(f"\033]0;{TITLE}\007")
+            sys.stdout.flush()
 
     try:
         curses.wrapper(run, args)
