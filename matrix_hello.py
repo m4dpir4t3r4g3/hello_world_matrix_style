@@ -7,11 +7,13 @@ matrix-hello: a Matrix-inspired "Hello, World".
     Follow the white rabbit.
     Knock, knock, Neo.
 
-...then digital rain, then HELLO, WORLD decoded out of the code.
+...then digital rain, then HELLO, WORLD decoded out of the code, with
+synthesized sound effects (see matrix_sound.py).
 
 Uses only the Python standard library (curses) on Linux and macOS. On
 Windows, curses comes from the `windows-curses` package. Keys:
     any key   skip to the next scene (exits on the final scene)
+    m         mute / unmute
     q / Esc   quit immediately
 """
 
@@ -28,6 +30,27 @@ try:
 except ImportError:
     sys.exit("matrix-hello needs the curses module.\n"
              "On Windows, install it with:  py -m pip install windows-curses")
+
+try:
+    from matrix_sound import Sound
+except ImportError:  # matrix_sound.py missing: run silently
+    Sound = None
+
+
+class Silence:
+    """Stands in for Sound when sound is off."""
+
+    def play(self, *args, **kwargs):
+        pass
+
+    def ambient(self, level):
+        pass
+
+    def toggle_mute(self):
+        pass
+
+    def close(self):
+        pass
 
 TITLE = "matrix-hello"
 
@@ -52,8 +75,9 @@ class Quit(Exception):
 
 
 class Screen:
-    def __init__(self, stdscr, args):
+    def __init__(self, stdscr, args, sound):
         self.s = stdscr
+        self.sound = sound
         self.fps = args.fps
         self.glyphs = GLYPHS_ASCII if args.ascii else GLYPHS_UNICODE
         self.cursor = "_" if args.ascii else "█"
@@ -121,6 +145,9 @@ class Screen:
             curses.resize_term(0, 0)  # PDCurses only picks up the new size when asked
         if ch in (-1, curses.KEY_RESIZE):
             return
+        if ch in (ord("m"), ord("M")):
+            self.sound.toggle_mute()
+            return
         if ch in (ord("q"), ord("Q"), 27):
             raise Quit
         raise Skip
@@ -146,6 +173,8 @@ class Screen:
         for i, ch in enumerate(text):
             self.put(y, x + i, ch + self.cursor, attr)
             self.refresh()
+            if ch != " ":
+                self.sound.play("key")
             delay = random.uniform(0.05, 0.13)
             if ch in ".,":
                 delay += 0.22
@@ -180,6 +209,8 @@ def hop_rabbit(sc):
     while x < w:
         started = time.monotonic()
         lift = int(round(math.sin(math.pi * (t % 10) / 10) * jump))
+        if t % 10 == 0:
+            sc.sound.play("hop")
         for yy in range(top - jump, bottom + 1):
             sc.put(yy, 0, blank)
         for i, line in enumerate(RABBIT):
@@ -209,6 +240,10 @@ def intro(sc, name):
     for text, hold in script:
         sc.clear()
         sc.typewrite(y, x, text, attr)
+        if text.startswith("Knock"):
+            # ...and then someone actually knocks at the door.
+            sc.sound.play("knock", delay=0.5)
+            sc.sound.play("knock", delay=0.8)
         sc.blink(y, x + len(text), hold, attr)
         if "rabbit" in text:
             hop_rabbit(sc)
@@ -307,6 +342,8 @@ class Rain:
 
 
 def rain_phase(sc, rain, seconds):
+    sc.sound.play("whoosh")
+    sc.sound.ambient(1.0)
     end = time.monotonic() + seconds
     while time.monotonic() < end:
         started = time.monotonic()
@@ -356,17 +393,27 @@ def finale(sc, rain, message, name, timeout):
         # Title, decoding out of the rain
         cx = left + (box_w - len(title)) // 2
         ty = top + 2
+        note = 0
         for i, ch in enumerate(title):
             if ch == " ":
                 continue
+            if frame_no == locks[i]:
+                sc.sound.play("ping", index=note)
+            note += 1
             if frame_no >= locks[i]:
                 sc.put(ty, cx + i, ch, sc.WHITE)
             else:
                 sc.put(ty, cx + i, sc.glyph(), sc.BRIGHT)
 
         done_at = max(locks) + 10
+        if frame_no == max(locks) + 2:
+            sc.sound.play("boom")
+            sc.sound.ambient(0.5)
         if frame_no > done_at:
-            shown = sub[: (frame_no - done_at) // 2]
+            typed = (frame_no - done_at) // 2
+            shown = sub[:typed]
+            if (frame_no - done_at) % 2 == 0 and 1 <= typed <= len(sub) and sub[typed - 1] != " ":
+                sc.sound.play("key", gain=0.6)
             sc.put(ty + 2, left + (box_w - len(sub)) // 2, shown, sc.GREEN)
         hint_at = done_at + len(sub) * 2 + sc.fps
         if frame_no > hint_at and (frame_no // (sc.fps // 2 or 1)) % 2 == 0:
@@ -378,8 +425,8 @@ def finale(sc, rain, message, name, timeout):
 
 # ---------------------------------------------------------------------------
 
-def run(stdscr, args):
-    sc = Screen(stdscr, args)
+def run(stdscr, args, sound):
+    sc = Screen(stdscr, args, sound)
     try:
         if args.splash:
             try:
@@ -418,6 +465,13 @@ def main():
     p.add_argument("--no-intro", action="store_true", help="skip the 'Wake up, Neo' intro")
     p.add_argument("--splash", type=float, metavar="SECONDS",
                    help="only show the rain for SECONDS, then exit (used by matrix-terminal)")
+    p.add_argument("--mute", action="store_true",
+                   help="no sound (also: MATRIX_HELLO_SOUND=0)")
+    p.add_argument("--sound", action="store_true",
+                   help="play sound with --splash too (it's quiet by default there)")
+    p.add_argument("--volume", type=int,
+                   default=int(os.environ.get("MATRIX_HELLO_VOLUME", "60") or 60),
+                   help="0-100 (default: 60, or $MATRIX_HELLO_VOLUME)")
     p.add_argument("--ascii", action="store_true",
                    help="ASCII glyphs only, for fonts without katakana")
     args = p.parse_args()
@@ -439,10 +493,15 @@ def main():
             sys.stdout.write(f"\033]0;{TITLE}\007")
             sys.stdout.flush()
 
+    quiet = (args.mute or os.environ.get("MATRIX_HELLO_SOUND") == "0"
+             or (args.splash and not args.sound) or args.volume <= 0)
+    sound = Silence() if quiet or Sound is None else Sound(args.volume / 100)
     try:
-        curses.wrapper(run, args)
+        curses.wrapper(run, args, sound)
     except KeyboardInterrupt:
         pass
+    finally:
+        sound.close()
 
 
 if __name__ == "__main__":

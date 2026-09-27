@@ -1,5 +1,6 @@
 # Installs matrix-hello on Windows 10/11:
-#   - runs it fullscreen every time you log in (Startup folder shortcut)
+#   - runs it fullscreen every time you log in (a scheduled task, or a
+#     Startup folder shortcut if Windows doesn't allow the task)
 #   - adds "Matrix PowerShell" and "Matrix CMD" profiles to Windows Terminal
 #   - adds "Matrix Terminal" to the Start menu
 #
@@ -53,7 +54,9 @@ if ($LASTEXITCODE -ne 0) {
 
 # 3) Files
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
-Copy-Item -LiteralPath (Join-Path $Src 'matrix_hello.py') -Destination $Dest -Force
+foreach ($f in 'matrix_hello.py', 'matrix_sound.py') {
+    Copy-Item -LiteralPath (Join-Path $Src $f) -Destination $Dest -Force
+}
 foreach ($f in 'matrix-hello-launch.ps1', 'matrix-profile.ps1', 'matrix-cmd.cmd', 'uninstall.ps1') {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $f) -Destination $Dest -Force
 }
@@ -110,12 +113,40 @@ $lnk.Save()
 Write-Host "Added 'Matrix Terminal' to the Start menu"
 
 if (-not $NoAutostart) {
-    $lnk = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Startup')) 'Matrix Hello.lnk'))
-    $lnk.TargetPath = $powershell
-    $lnk.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$Dest\matrix-hello-launch.ps1`""
-    $lnk.WindowStyle = 7   # start minimized, so no console flashes up
-    $lnk.Save()
-    Write-Host "matrix-hello will run every time you log in"
+    # Start Windows Terminal straight away: going through PowerShell first
+    # adds a few seconds at login, when everything is busy.
+    if ($wt) {
+        $runExe = $wt.Source
+        $runArgs = "--fullscreen new-tab --title matrix-hello --colorScheme Matrix `"$python`" `"$Dest\matrix_hello.py`""
+    } else {
+        $runExe = $powershell
+        $runArgs = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$Dest\matrix-hello-launch.ps1`""
+    }
+    $startupLnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'Matrix Hello.lnk'
+
+    # A logon task starts as soon as you log in. Startup folder shortcuts are
+    # held back by Windows until the desktop has settled, which takes a while.
+    $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    try {
+        $task = @{
+            TaskName  = 'Matrix Hello'
+            Action    = New-ScheduledTaskAction -Execute $runExe -Argument $runArgs
+            Trigger   = New-ScheduledTaskTrigger -AtLogOn -User $user
+            Principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+            Settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        }
+        Register-ScheduledTask @task -Force -ErrorAction Stop | Out-Null
+        Remove-Item -LiteralPath $startupLnk -ErrorAction SilentlyContinue  # from older versions
+        Write-Host "matrix-hello will run every time you log in (scheduled task 'Matrix Hello')"
+    } catch {
+        $lnk = $shell.CreateShortcut($startupLnk)
+        $lnk.TargetPath = $runExe
+        $lnk.Arguments = $runArgs
+        $lnk.WindowStyle = 7   # minimized, so nothing flashes up before the terminal
+        $lnk.Save()
+        Write-Host "matrix-hello will run every time you log in (Startup folder shortcut)"
+        Write-Host "  Tip: run install.cmd as administrator once for a faster start at login."
+    }
 }
 
 Write-Host ""

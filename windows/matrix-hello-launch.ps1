@@ -1,14 +1,14 @@
 # Opens matrix_hello.py fullscreen in Windows Terminal (or a maximized
-# console window if Windows Terminal isn't installed). The installer puts a
-# shortcut to this script in your Startup folder, so it runs at every login.
+# console window if Windows Terminal isn't installed). Login autostart only
+# uses this when Windows Terminal is missing; otherwise it starts it directly.
 #
-# Env: MATRIX_HELLO_DELAY  seconds to wait for the desktop (default 3)
+# Env: MATRIX_HELLO_DELAY  seconds to wait before starting (default 0)
 #      MATRIX_HELLO_NAME   who to wake up (default Neo)
 $ErrorActionPreference = 'Stop'
 
 $python = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'python-path.txt') -Raw).Trim()
 $script = Join-Path $PSScriptRoot 'matrix_hello.py'
-$delay = if ($env:MATRIX_HELLO_DELAY) { [double]$env:MATRIX_HELLO_DELAY } else { 3 }
+$delay = if ($env:MATRIX_HELLO_DELAY) { [double]$env:MATRIX_HELLO_DELAY } else { 0 }
 Start-Sleep -Seconds $delay
 
 $wt = Get-Command wt.exe -ErrorAction SilentlyContinue

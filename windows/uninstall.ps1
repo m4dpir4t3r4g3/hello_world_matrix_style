@@ -1,6 +1,7 @@
 # Removes matrix-hello from Windows. Leaves Python and windows-curses alone.
 $ErrorActionPreference = 'SilentlyContinue'
 
+Unregister-ScheduledTask -TaskName 'Matrix Hello' -Confirm:$false
 Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Startup')) 'Matrix Hello.lnk')
 Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Programs')) 'Matrix Terminal.lnk')
 Remove-Item -LiteralPath (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\matrix-hello') -Recurse

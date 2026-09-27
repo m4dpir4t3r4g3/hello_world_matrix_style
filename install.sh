@@ -22,7 +22,7 @@ python3 -c "import curses" 2>/dev/null || { echo "python3 is missing the curses 
 
 mkdir -p "$DEST" "$BIN" "$APPS"
 install -m 755 "$SRC/matrix_hello.py" "$SRC/matrix-hello-launch" "$SRC/matrix-terminal" "$DEST/"
-install -m 644 "$SRC/term.sh" "$SRC/matrix.bashrc" "$DEST/"
+install -m 644 "$SRC/matrix_sound.py" "$SRC/term.sh" "$SRC/matrix.bashrc" "$DEST/"
 ln -sf "$DEST/matrix_hello.py" "$BIN/matrix-hello"
 ln -sf "$DEST/matrix-hello-launch" "$BIN/matrix-hello-launch"
 ln -sf "$DEST/matrix-terminal" "$BIN/matrix-terminal"
