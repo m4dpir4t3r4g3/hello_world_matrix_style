@@ -18,6 +18,25 @@ Linux (any distro, any desktop) and Windows 10/11. It also comes with a
 Then digital rain in green katakana fills the screen and **H E L L O ,  W O R L D .**
 decodes out of it: *"Welcome to the real world, Neo."*
 
+### Sound
+
+It has sound effects too, synthesized as it runs, so there are no audio files
+to install:
+
+- a soft digital tick for every character typed on the screen
+- two knocks at the door after *"Knock, knock"*
+- a little boing each time the white rabbit hops
+- a whoosh as the rain arrives, then a humming, shimmering ambience of
+  falling code
+- a rising chime as each letter of HELLO, WORLD locks into place, and a
+  deep boom when it's done
+
+Press `m` to mute. Use `--mute` or `--volume 30` for one run, or
+`MATRIX_HELLO_SOUND=0` / `MATRIX_HELLO_VOLUME=30` to change it for good.
+On Linux it plays through `pacat` (PulseAudio / PipeWire) or `aplay` (ALSA),
+which almost every desktop already has. On Windows it uses Windows' built-in
+audio. If there's no way to play sound, it just runs silently.
+
 ## Install on Linux
 
 ```bash
@@ -60,8 +79,11 @@ alacritty, kitty, foot, wezterm, tilix, terminator, xterm and others. Set
 The installer:
 
 - installs `windows-curses`, which Python on Windows needs for this
-- runs matrix-hello fullscreen in Windows Terminal every time you log in (a
-  shortcut in your Startup folder)
+- runs matrix-hello fullscreen in Windows Terminal as soon as you log in. It
+  uses a scheduled task that starts Windows Terminal directly. If Windows
+  won't allow the task, it uses a Startup folder shortcut instead. Windows
+  holds those back for a few seconds after login, so running `install.cmd` as
+  administrator once gets you the faster start.
 - adds **Matrix PowerShell** and **Matrix CMD** profiles to Windows Terminal
 - adds **Matrix Terminal** to the Start menu
 
@@ -93,6 +115,7 @@ terminals support. Set `MATRIX_SPLASH=0` to skip the rain, or
 | Key       | Action                                           |
 |-----------|--------------------------------------------------|
 | any key   | skip to the next scene (exits on the last scene) |
+| `m`       | mute / unmute                                    |
 | `q`/`Esc` | exit immediately                                 |
 
 After the final message appears, it closes by itself after 60 seconds.
@@ -105,6 +128,8 @@ matrix-hello --message "Hello, $USER"  # change the decoded message
 matrix-hello --no-intro                # go straight to the rain
 matrix-hello --rain-seconds 10 --timeout 0   # more rain, stay until a key
 matrix-hello --splash 5                # just 5 seconds of rain
+matrix-hello --volume 30               # quieter (0-100, default 60)
+matrix-hello --mute                    # no sound
 matrix-hello --ascii                   # font has no katakana? use ASCII
 ```
 
@@ -114,9 +139,11 @@ the Windows version:
 | Variable                | Default   | Meaning                             |
 |-------------------------|-----------|-------------------------------------|
 | `MATRIX_HELLO_NAME`     | `Neo`     | who to wake up (and the prompt name) |
-| `MATRIX_HELLO_DELAY`    | `2` (Linux), `3` (Windows) | seconds to wait after login |
+| `MATRIX_HELLO_DELAY`    | `2` (Linux), `0` (Windows) | seconds to wait after login |
+| `MATRIX_HELLO_SOUND`    | `1`       | `0` turns the sound off             |
+| `MATRIX_HELLO_VOLUME`   | `60`      | volume, 0-100                       |
 | `MATRIX_HELLO_TERMINAL` | auto      | Linux only, e.g. `konsole`, `alacritty` |
-| `MATRIX_SPLASH`         | `2`       | seconds of rain when Matrix Terminal opens; `0` for none |
+| `MATRIX_SPLASH`         | `2`       | seconds of rain when Matrix Terminal opens; `0` for none. The splash is silent, so opening a terminal never makes noise. |
 
 Set them in `~/.profile` on Linux, or for your Windows user with
 `setx MATRIX_HELLO_NAME Trinity`.
